@@ -58,7 +58,7 @@ data:
     echo "waiting unmount pvc from other pods..."
     bash /opt/wait.sh
     echo "sending data"
-    kubectl exec -it $SRC_POD -- /usr/bin/rsync -auz -e "ssh -i /tmp/key -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" $SRC_DIR/ $DST_IP:$DST_DIR/
+    kubectl exec -it $SRC_POD -- /usr/bin/rsync -auz --numeric-ids -e "ssh -i /tmp/key -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" $SRC_DIR/ $DST_IP:$DST_DIR/
     echo "verifying..."
     EXPECTED_HASH=`kubectl exec -it $SRC_POD -- bash -c "find $SRC_DIR -type f |xargs md5sum |sort |md5sum"`
     EXACT_HASH=`kubectl exec -it $DST_POD -- bash -c "find $DST_DIR -type f |xargs md5sum |sort |md5sum"`
