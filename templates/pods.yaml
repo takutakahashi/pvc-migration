@@ -1,0 +1,109 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-robber
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: robber
+    spec:
+      serviceAccountName: {{ .Release.Name }}-migration-sa
+      {{- if .Values.from.tolerations }}
+      tolerations:
+{{ toYaml .Values.from.tolerations | indent 8 }}
+      {{- end }}
+      {{- if .Values.from.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.from.nodeSelector | indent 8 }}
+      {{- end }}
+      containers:
+        - image: ubuntu
+          command:
+            - bash
+            - -x
+            - /opt/rob.sh
+          name: rob
+          volumeMounts:
+            - name: scripts
+              mountPath: /opt
+      volumes:
+        - name: scripts
+          configMap:
+            name: {{ .Release.Name }}-scripts
+---
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-from
+spec:
+  backoffLimit: 10
+  template:
+    spec:
+      serviceAccountName: {{ .Release.Name }}-migration-sa
+      {{- if .Values.from.tolerations }}
+      tolerations:
+{{ toYaml .Values.from.tolerations | indent 8 }}
+      {{- end }}
+      {{- if .Values.from.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.from.nodeSelector | indent 8 }}
+      {{- end }}
+      restartPolicy: OnFailure
+      containers:
+        - command:
+          - bash
+          - -xe
+          - /opt/exec.sh
+          image: ubuntu
+          imagePullPolicy: Always
+          name: send
+          volumeMounts:
+            - name: scripts
+              mountPath: /opt
+            - name: vol
+              mountPath: /tmp/vol
+      volumes:
+        - name: scripts
+          configMap:
+            name: {{ .Release.Name }}-scripts
+        - name: vol
+          persistentVolumeClaim:
+            claimName: {{ .Values.from.pvc_name }}
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ .Release.Name }}-to
+spec:
+  {{- if .Values.to.tolerations }}
+  tolerations:
+{{ toYaml .Values.to.tolerations  | indent 4 }}
+  {{- end }}
+  {{- if .Values.to.nodeSelector }}
+  nodeSelector:
+{{ toYaml .Values.to.nodeSelector | indent 4 }}
+  {{- end }}
+  containers:
+    - command:
+      - bash
+      - -xe
+      - /opt/ssh.sh
+      image: ubuntu
+      imagePullPolicy: Always
+      name: recv
+      volumeMounts:
+        - name: scripts
+          mountPath: /opt
+        - name: vol
+          mountPath: /tmp/vol
+  volumes:
+    - name: scripts
+      configMap:
+        name: {{ .Release.Name }}-scripts
+    - name: vol
+      persistentVolumeClaim:
+        claimName: {{ .Values.to.pvc_name }}

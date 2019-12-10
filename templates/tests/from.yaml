@@ -1,0 +1,37 @@
+{{- if .Values.test.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app: nginx
+  name: nginx-pvc1
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: nginx1
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: nginx1
+    spec:
+      containers:
+        - image: nginx
+          name: recv
+          volumeMounts:
+            - name: scripts
+              mountPath: /opt
+      volumes:
+        - name: scripts
+          persistentVolumeClaim:
+            claimName: nginx-pvc1
+{{- end }}

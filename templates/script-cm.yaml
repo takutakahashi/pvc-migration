@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-scripts
+data:
+  rob.sh: |
+    #!/bin/bash -x
+    TARGET_PVC="{{ .Values.from.pvc_name }}"
+    bash /opt/init.sh
+    while true; do
+    kubectl get pod -o json |jq ".items | map(select(.spec.volumes[].persistentVolumeClaim.claimName == \"$TARGET_PVC\" and .metadata.generateName != \"{{ .Release.Name }}-from-\" and .status.phase == \"Running\")) | .[].metadata.name" |xargs kubectl delete pod
+      sleep 1
+    done
+
+  init.sh: |
+    #!/bin/bash -xe
+    apt update && apt install -y curl jq
+    curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+    chmod +x kubectl
+    mv kubectl /bin/
+
+  wait.sh: |
+    #!/bin/bash -xe
+    TARGET_PVC="{{ .Values.from.pvc_name }}"
+    while true; do
+      MOUNT_COUNT=`kubectl get pod -o json |jq ".items | map(select(.spec.volumes[].persistentVolumeClaim.claimName == \"$TARGET_PVC\" and .metadata.generateName != \"{{ .Release.Name }}-from-\" and .status.phase == \"Running\")) | .[].metadata.name" | wc -l`
+      if [ "$MOUNT_COUNT" = "0" ]; then
+       exit 0
+      fi
+      sleep 1
+    done
+
+  exec.sh: |
+    #!/bin/bash -xe
+    bash /opt/init.sh
+    apt install -y netcat openssh-server rsync
+    DST_POD="{{ .Release.Name }}-to"
+    DST_IP=`kubectl get pod $DST_POD -o jsonpath="{ .status.podIP }"`
+    SRC_DIR="/tmp/vol"
+    DST_DIR="$SRC_DIR"
+    if [ "$SRC_DIR" = "" ]; then
+      echo "source directory undefined"
+      exit 1
+    fi
+    if [ "$DST_DIR" = "" ]; then
+      echo "destination directory undefined"
+      exit 1
+    fi
+    echo "check connection..."
+    while [ "`nc -z $DST_IP 22; echo $?`" = "1" ]; do
+      DST_IP=`kubectl get pod $DST_POD -o jsonpath="{ .status.podIP }"`
+      sleep 5
+    done
+    echo "connection ready."
+    echo "prepareing key"
+    ssh-keygen -b 4096 -t rsa -f /tmp/key -q -N ""
+    kubectl cp /tmp/key.pub $DST_POD:/root/.ssh/authorized_keys
+    chmod 600 /tmp/key
+    echo "waiting unmount pvc from other pods..."
+    bash /opt/wait.sh
+    echo "sending data"
+    /usr/bin/rsync -auz -e "ssh -i /tmp/key -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" $SRC_DIR/ $DST_IP:$DST_DIR/
+    echo "verifying..."
+    EXPECTED_HASH=`find $SRC_DIR -type f |xargs md5sum |sort |md5sum`
+    EXACT_HASH=`kubectl exec -it $DST_POD -- bash -c "find $DST_DIR -type f |xargs md5sum |sort |md5sum"`
+    if [ "$EXPECTED_HASH" != "$EXACT_HASH" ]; then
+      echo "transfered file hash was wrong source"
+      exit 1
+    fi
+    echo "done"
+
+  ssh.sh: |
+    #!/bin/bash -xe
+    apt update && apt install -y openssh-server rsync
+    mkdir /run/sshd
+    mkdir /root/.ssh
+    /usr/sbin/sshd -D
