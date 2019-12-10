@@ -37,7 +37,7 @@ spec:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ .Release.Name }}-send
+  name: {{ .Release.Name }}-transfer
 spec:
   backoffLimit: 10
   template:
