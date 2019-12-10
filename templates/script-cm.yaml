@@ -36,12 +36,17 @@ data:
     apt install -y netcat openssh-server rsync
     SRC_POD=`kubectl get pod |grep {{ .Release.Name }}-from |awk '{print $1}'`
     DST_POD=`kubectl get pod |grep {{ .Release.Name }}-to |awk '{print $1}'`
-    DST_IP=`kubectl get pod $DST_POD -o jsonpath="{ .status.podIP }"`
     SRC_DIR="/tmp/vol"
     DST_DIR="$SRC_DIR"
     echo "check connection..."
+    DST_IP=`kubectl get pod $DST_POD -o jsonpath="{ .status.podIP }"`
     while [ "`nc -z $DST_IP 22; echo $?`" = "1" ]; do
       DST_IP=`kubectl get pod $DST_POD -o jsonpath="{ .status.podIP }"`
+      sleep 5
+    done
+    SRC_IP=`kubectl get pod $SRC_POD -o jsonpath="{ .status.podIP }"`
+    while [ "`nc -z $SRC_IP 22; echo $?`" = "1" ]; do
+      SRC_IP=`kubectl get pod $SRC_POD -o jsonpath="{ .status.podIP }"`
       sleep 5
     done
     echo "connection ready."
