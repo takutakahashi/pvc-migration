@@ -37,7 +37,7 @@ spec:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ .Release.Name }}-from
+  name: {{ .Release.Name }}-send
 spec:
   backoffLimit: 10
   template:
@@ -60,6 +60,40 @@ spec:
           image: ubuntu
           imagePullPolicy: Always
           name: send
+          volumeMounts:
+            - name: scripts
+              mountPath: /opt
+      volumes:
+        - name: scripts
+          configMap:
+            name: {{ .Release.Name }}-scripts
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-from
+spec:
+  backoffLimit: 10
+  template:
+    spec:
+      serviceAccountName: {{ .Release.Name }}-migration-sa
+      {{- if .Values.from.tolerations }}
+      tolerations:
+{{ toYaml .Values.from.tolerations | indent 8 }}
+      {{- end }}
+      {{- if .Values.from.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.from.nodeSelector | indent 8 }}
+      {{- end }}
+      restartPolicy: OnFailure
+      containers:
+        - command:
+          - bash
+          - -xe
+          - /opt/ssh.sh
+          image: ubuntu
+          imagePullPolicy: Always
+          name: from
           volumeMounts:
             - name: scripts
               mountPath: /opt

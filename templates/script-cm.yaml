@@ -34,18 +34,11 @@ data:
     #!/bin/bash -xe
     bash /opt/init.sh
     apt install -y netcat openssh-server rsync
-    DST_POD="{{ .Release.Name }}-to"
+    SRC_POD=`kubectl get pod |grep {{ .Release.Name }}-from |awk '{print $1}'`
+    DST_POD=`kubectl get pod |grep {{ .Release.Name }}-to |awk '{print $1}'`
     DST_IP=`kubectl get pod $DST_POD -o jsonpath="{ .status.podIP }"`
     SRC_DIR="/tmp/vol"
     DST_DIR="$SRC_DIR"
-    if [ "$SRC_DIR" = "" ]; then
-      echo "source directory undefined"
-      exit 1
-    fi
-    if [ "$DST_DIR" = "" ]; then
-      echo "destination directory undefined"
-      exit 1
-    fi
     echo "check connection..."
     while [ "`nc -z $DST_IP 22; echo $?`" = "1" ]; do
       DST_IP=`kubectl get pod $DST_POD -o jsonpath="{ .status.podIP }"`
@@ -54,14 +47,15 @@ data:
     echo "connection ready."
     echo "prepareing key"
     ssh-keygen -b 4096 -t rsa -f /tmp/key -q -N ""
+    kubectl cp /tmp/key $SRC_POD:/tmp
     kubectl cp /tmp/key.pub $DST_POD:/root/.ssh/authorized_keys
     chmod 600 /tmp/key
     echo "waiting unmount pvc from other pods..."
     bash /opt/wait.sh
     echo "sending data"
-    /usr/bin/rsync -auz -e "ssh -i /tmp/key -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" $SRC_DIR/ $DST_IP:$DST_DIR/
+    kubectl exec -it $SRC_POD -- /usr/bin/rsync -auz -e "ssh -i /tmp/key -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" $SRC_DIR/ $DST_IP:$DST_DIR/
     echo "verifying..."
-    EXPECTED_HASH=`find $SRC_DIR -type f |xargs md5sum |sort |md5sum`
+    EXPECTED_HASH=`kubectl exec -it $SRC_POD -- bash -c "find $SRC_DIR -type f |xargs md5sum |sort |md5sum"`
     EXACT_HASH=`kubectl exec -it $DST_POD -- bash -c "find $DST_DIR -type f |xargs md5sum |sort |md5sum"`
     if [ "$EXPECTED_HASH" != "$EXACT_HASH" ]; then
       echo "transfered file hash was wrong source"
