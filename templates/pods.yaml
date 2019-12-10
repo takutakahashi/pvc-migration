@@ -68,13 +68,16 @@ spec:
           configMap:
             name: {{ .Release.Name }}-scripts
 ---
-apiVersion: batch/v1
-kind: Job
+apiVersion: extensions/v1beta1
+kind: Deployment
 metadata:
   name: {{ .Release.Name }}-from
 spec:
-  backoffLimit: 10
+  replicas: 1
   template:
+    metadata:
+      labels:
+        app: from
     spec:
       serviceAccountName: {{ .Release.Name }}-migration-sa
       {{- if .Values.from.tolerations }}
@@ -85,7 +88,6 @@ spec:
       nodeSelector:
 {{ toYaml .Values.from.nodeSelector | indent 8 }}
       {{- end }}
-      restartPolicy: OnFailure
       containers:
         - command:
           - bash
