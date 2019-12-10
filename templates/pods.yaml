@@ -110,36 +110,42 @@ spec:
             claimName: {{ .Values.from.pvc_name }}
 
 ---
-apiVersion: v1
-kind: Pod
+apiVersion: extensions/v1beta1
+kind: Deployment
 metadata:
   name: {{ .Release.Name }}-to
 spec:
-  {{- if .Values.to.tolerations }}
-  tolerations:
-{{ toYaml .Values.to.tolerations  | indent 4 }}
-  {{- end }}
-  {{- if .Values.to.nodeSelector }}
-  nodeSelector:
-{{ toYaml .Values.to.nodeSelector | indent 4 }}
-  {{- end }}
-  containers:
-    - command:
-      - bash
-      - -xe
-      - /opt/ssh.sh
-      image: ubuntu
-      imagePullPolicy: Always
-      name: recv
-      volumeMounts:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: to
+    spec:
+      {{- if .Values.to.tolerations }}
+      tolerations:
+{{ toYaml .Values.to.tolerations  | indent 8 }}
+      {{- end }}
+      {{- if .Values.to.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.to.nodeSelector | indent 8 }}
+      {{- end }}
+      containers:
+        - command:
+          - bash
+          - -xe
+          - /opt/ssh.sh
+          image: ubuntu
+          imagePullPolicy: Always
+          name: recv
+          volumeMounts:
+            - name: scripts
+              mountPath: /opt
+            - name: vol
+              mountPath: /tmp/vol
+      volumes:
         - name: scripts
-          mountPath: /opt
+          configMap:
+            name: {{ .Release.Name }}-scripts
         - name: vol
-          mountPath: /tmp/vol
-  volumes:
-    - name: scripts
-      configMap:
-        name: {{ .Release.Name }}-scripts
-    - name: vol
-      persistentVolumeClaim:
-        claimName: {{ .Values.to.pvc_name }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.to.pvc_name }}
