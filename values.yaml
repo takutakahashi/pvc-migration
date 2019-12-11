@@ -1,0 +1,10 @@
+test:
+  enabled: false
+from:
+  pvc_name: old-pvc-name
+  nodeSelector: {}
+  tolerations: []
+to:
+  pvc_name: new-pvc-name
+  nodeSelector: {}
+  tolerations: []
