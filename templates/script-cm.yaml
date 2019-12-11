@@ -8,7 +8,7 @@ data:
     TARGET_PVC="{{ .Values.from.pvc_name }}"
     bash /opt/init.sh
     while true; do
-    kubectl get pod -o json |jq ".items | map(select(.spec.volumes[].persistentVolumeClaim.claimName == \"$TARGET_PVC\" and .metadata.generateName != \"{{ .Release.Name }}-from-\" and .status.phase == \"Running\")) | .[].metadata.name" |xargs kubectl delete pod
+    kubectl get pod -o json |jq ".items | map(select(.spec.volumes[].persistentVolumeClaim.claimName == \"$TARGET_PVC\" and .metadata.labels.app != \"from\" and .status.phase == \"Running\")) | .[].metadata.name" |xargs kubectl delete pod
       sleep 1
     done
 
@@ -23,7 +23,7 @@ data:
     #!/bin/bash -xe
     TARGET_PVC="{{ .Values.from.pvc_name }}"
     while true; do
-      MOUNT_COUNT=`kubectl get pod -o json |jq ".items | map(select(.spec.volumes[].persistentVolumeClaim.claimName == \"$TARGET_PVC\" and .metadata.generateName != \"{{ .Release.Name }}-from-\" and .status.phase == \"Running\")) | .[].metadata.name" | wc -l`
+      MOUNT_COUNT=`kubectl get pod -o json |jq ".items | map(select(.spec.volumes[].persistentVolumeClaim.claimName == \"$TARGET_PVC\" and .metadata.labels.app != \"from\" and .status.phase == \"Running\")) | .[].metadata.name" | wc -l`
       if [ "$MOUNT_COUNT" = "0" ]; then
        exit 0
       fi
