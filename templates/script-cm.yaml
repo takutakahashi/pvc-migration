@@ -6,18 +6,10 @@ data:
   rob.sh: |
     #!/bin/bash -x
     TARGET_PVC="{{ .Values.from.pvc_name }}"
-    bash /opt/init.sh
     while true; do
     kubectl get pod -o json |jq ".items | map(select(.spec.volumes[].persistentVolumeClaim.claimName == \"$TARGET_PVC\" and .metadata.labels.app != \"from\" and .status.phase == \"Running\")) | .[].metadata.name" |xargs kubectl delete pod
       sleep 1
     done
-
-  init.sh: |
-    #!/bin/bash -xe
-    apt update && apt install -y curl jq
-    curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
-    chmod +x kubectl
-    mv kubectl /bin/
 
   wait.sh: |
     #!/bin/bash -xe
@@ -32,8 +24,6 @@ data:
 
   exec.sh: |
     #!/bin/bash -xe
-    bash /opt/init.sh
-    apt install -y netcat openssh-server rsync
     SRC_POD=`kubectl get pod |grep {{ .Release.Name }}-from |awk '{print $1}'`
     DST_POD=`kubectl get pod |grep {{ .Release.Name }}-to |awk '{print $1}'`
     SRC_DIR="/tmp/vol"
@@ -70,7 +60,6 @@ data:
 
   ssh.sh: |
     #!/bin/bash -xe
-    apt update && apt install -y openssh-server rsync
     mkdir /run/sshd
     mkdir /root/.ssh
     /usr/sbin/sshd -D

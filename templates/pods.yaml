@@ -19,7 +19,7 @@ spec:
 {{ toYaml .Values.from.nodeSelector | indent 8 }}
       {{- end }}
       containers:
-        - image: ubuntu
+        - image: takutakahashi/pvc-migration
           command:
             - bash
             - -x
@@ -57,7 +57,7 @@ spec:
           - bash
           - -xe
           - /opt/exec.sh
-          image: ubuntu
+          image: takutakahashi/pvc-migration
           imagePullPolicy: Always
           name: send
           volumeMounts:
@@ -93,7 +93,7 @@ spec:
           - bash
           - -xe
           - /opt/ssh.sh
-          image: ubuntu
+          image: takutakahashi/pvc-migration
           imagePullPolicy: Always
           name: from
           volumeMounts:
@@ -134,7 +134,7 @@ spec:
           - bash
           - -xe
           - /opt/ssh.sh
-          image: ubuntu
+          image: takutakahashi/pvc-migration
           imagePullPolicy: Always
           name: recv
           volumeMounts:
